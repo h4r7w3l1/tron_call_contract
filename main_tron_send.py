@@ -18,7 +18,7 @@ colorama.init()
 
 logdir = "logs"
 config = configparser.ConfigParser()
-config.read("tmp\\config.ini")
+config.read("config.ini")
 
 
 NETWORK="NILE" # "MAINNET"
