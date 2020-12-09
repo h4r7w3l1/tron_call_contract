@@ -1,26 +1,30 @@
 ﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import os
-import sys
 from random import randint
 from time import sleep
 import json
 import configparser
+import argparse
 from decimal import Decimal
 from tronpy import Tron
 from tronpy.keys import PrivateKey
 from tronpy.exceptions import AddressNotFound
 
 config = configparser.ConfigParser()
-config.read("config.ini") 
+config.read("config.ini")  # Testnet tronchain = nile  or Real   tronchain = mainnet
+
 
 NETWORK="NILE" # "MAINNET"
 
 # Присваиваем значения внутренним переменным
-tronchain   = config[NETWORK]['tronchain']
+tronchain = config[NETWORK]['tronchain']
 pk = config[NETWORK]['pk']
 ctraddr = config[NETWORK]['contract']
-tronctl = config[NETWORK]['tronctl']
+amount = 130
+parser = argparse.ArgumentParser(description='Value TRX. Default or not set: 130 trx')
+parser.add_argument('-a', '--amount', type=int, action='store', dest='amount', default='130', required=True)
+args = parser.parse_args()
+print(args)
 
 client = Tron(network=tronchain)
 
@@ -52,7 +56,7 @@ def main(pk, amount):
 	kpub = priv_key.public_key.to_base58check_address()	# Get address from private key
 	kpub_balance = client.get_account_balance(kpub) #> Decimal('399.202692')
 	amountconv = (amount * 1000000)
-	if kpub_balance >= int(amount):
+	if kpub_balance >= amount:
 		walletgen_pub, walletgen_pk =  walletgenerate()
 		txn = (
 			client.trx.transfer(kpub, walletgen_pub, amountconv)
@@ -69,9 +73,15 @@ def main(pk, amount):
 		print(check_balance(walletgen_pub))
 		priv_key = PrivateKey(bytes.fromhex(walletgen_pk)) # restart object
 		freez20persent =  (float(walletgen_pub_bal) - (float(walletgen_pub_bal) * 0.8))
-		freez20persentint = str(int(freez20persent))
-		freezedelegat = os.system(tronctl +" account freeze " + freez20persentint + " --delegate " + walletgen_pub + " -t 1 -s another-imported -v")
-		print(freezedelegat)
+		amountFreeze = (freez20persent * 1000000)
+		txnfreez = (
+			client.trx.freeze_balance(walletgen_pub, int(amountFreeze),  "ENERGY")
+			.build()
+			.sign(priv_key)
+			)
+		print(txnfreez.txid)
+		hold_result = txnfreez.broadcast().wait()
+		print(hold_result)
 		sleep(160)
 	#else if
 		walletgen_pub_bal = client.get_account_balance(walletgen_pub)
@@ -79,7 +89,7 @@ def main(pk, amount):
 		cntr = client.get_contract(ctraddr)  # contract address to call
 		amountCntr = (walletgen_pub_bal * 1000000)
 		txcall = (
-			cntr.functions.deposit.with_transfer(int(amountCntr))	# 100_000_000 = 100
+			cntr.functions.deposit.with_transfer(amountCntr)	# 100_000_000 = 100
 			.call(walletgen_pub)
 			.with_owner(walletgen_pub)  # address of the _sender
 			.fee_limit(5_000_000)
@@ -94,9 +104,5 @@ def main(pk, amount):
     		print("Not enought money")
 	# print(check_balance(walletgen_pub))
 
-if __name__ == "__main__":
-    if len (sys.argv) > 1:
-    		amount = sys.argv[1]
-    		runtron = main(pk, int(amount))
-    else:
-        print ("Need amount sum")
+
+runtron = main(pk, amount)
